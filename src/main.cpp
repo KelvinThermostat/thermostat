@@ -11,7 +11,6 @@ const char *dname = "kelvin-controller";
 ESP8266WebServer server(80);
 BearSSL::ESP8266WebServerSecure serverHTTPS(443);
 Relay relay;
-ulong relayStartMillis;
 
 static const char serverCert[] PROGMEM = R"EOF(
 -----BEGIN CERTIFICATE-----
@@ -112,7 +111,6 @@ void showStatus()
 void start()
 {
   relay.on();
-  relayStartMillis = millis();
 
   server.send(201);
 }
@@ -120,7 +118,6 @@ void start()
 void stop()
 {
   relay.off();
-  relayStartMillis = 0;
 
   server.send(201);
 }
@@ -138,7 +135,7 @@ void setup()
   configTime(1 * 3600, 0, "pool.ntp.org", "time.nist.gov");
 
   serverHTTPS.getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
-  server.on("/", showStatus);
+  server.on("/status", showStatus);
   server.on("/on", start);
   server.on("/off", stop);
   server.begin();
