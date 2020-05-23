@@ -1,5 +1,6 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
+#include <ESP8266WebServer.h>
 #include <ESP8266WebServerSecure.h>
 #include "Relay.h"
 
@@ -7,7 +8,8 @@ const char *ssid = "BaconNet";
 const char *password = "5AlandaleClose//";
 const char *dname = "kelvin-controller";
 
-BearSSL::ESP8266WebServerSecure server(443);
+ESP8266WebServer server(80);
+BearSSL::ESP8266WebServerSecure serverHTTPS(443);
 Relay relay;
 ulong relayStartMillis;
 
@@ -87,7 +89,7 @@ bool connectToWifi()
   return false;
 }
 
-void showWebpage()
+void showStatus()
 {
   String content = "{\"on\":";
 
@@ -135,8 +137,8 @@ void setup()
 
   configTime(1 * 3600, 0, "pool.ntp.org", "time.nist.gov");
 
-  server.getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
-  server.on("/", showWebpage);
+  serverHTTPS.getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
+  server.on("/", showStatus);
   server.on("/on", start);
   server.on("/off", stop);
   server.begin();
