@@ -43,5 +43,7 @@ bool Relay::isOn()
 
 ulong Relay::getUpTime()
 {
-    return _relay_uptime;
+    int uptimeInSeconds = _relay_uptime / 1000;
+
+    return uptimeInSeconds;
 }
