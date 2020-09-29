@@ -3,14 +3,12 @@
 #include <ESP8266WebServer.h>
 #include <ESP8266WebServerSecure.h>
 #include "Relay.h"
-
-const char *ssid = "BaconNet";
-const char *password = "5AlandaleClose//";
-const char *dname = "kelvin-controller";
+#include "networkclient.h"
 
 ESP8266WebServer server(80);
 BearSSL::ESP8266WebServerSecure serverHTTPS(443);
 Relay relay;
+NetworkClient net;
 
 static const char serverCert[] PROGMEM = R"EOF(
 -----BEGIN CERTIFICATE-----
@@ -48,45 +46,6 @@ mSQzV9P5Ce+B6nspMNJSMiGCpXeqcp7QDnonnvnIDklOjl4sRbz62Y/H+pkFS6Jh
 Ze5rl6rRabt+
 -----END PRIVATE KEY-----
 )EOF";
-
-bool connectToWifi()
-{
-  byte timeout = 50;
-
-  Serial.println("\n\n");
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-
-  WiFi.begin(ssid, password);
-
-  for (int i = 0; i < timeout; i++)
-  {
-    if (WiFi.status() == WL_CONNECTED)
-    {
-      Serial.println("\nConnected to WiFi");
-      Serial.print("Server can be accessed at https://");
-      Serial.print(WiFi.localIP());
-
-      if (MDNS.begin(dname))
-      {
-        Serial.print(" or at https://");
-        Serial.print(dname);
-        Serial.println(".local");
-      }
-
-      return true;
-    }
-
-    delay(1000);
-    Serial.print(".");
-  }
-
-  Serial.println("\nFailed to connect to WiFi");
-  Serial.println("Check network status and access data");
-  Serial.println("Push RST to try again");
-
-  return false;
-}
 
 void showStatus()
 {
@@ -126,13 +85,12 @@ void setup()
 {
   Serial.begin(9600);
 
-  if (!connectToWifi())
-  {
-    delay(2000);
-    ESP.restart();
-  }
+  String host = "kelvin-switch-";
+  host += ESP.getChipId();
 
-  configTime(1 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  net = NetworkClient(&host);
+
+  net.connect();
 
   serverHTTPS.getServer().setRSACert(new BearSSL::X509List(serverCert), new BearSSL::PrivateKey(serverKey));
   server.on("/status", showStatus);
@@ -145,7 +103,7 @@ void setup()
 
 void loop()
 {
+  net.check();
   relay.check();
   server.handleClient();
-  MDNS.update();
 }
