@@ -1,0 +1,3 @@
+[submodule "lib/networkclient"]
+	path = lib/networkclient
+	url = https://github.com/KelvinThermostat/kelvin-networkclient.git
