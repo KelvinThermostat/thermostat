@@ -6,8 +6,9 @@
 ESP8266WebServer server(80);
 Relay relay;
 NetworkClient net;
+String host = "kelvin-switch-";
 
-void showStatus()
+void endpointStatus()
 {
   String content = "{\"on\":";
 
@@ -27,14 +28,14 @@ void showStatus()
   server.send(200, "application/json", content);
 }
 
-void start()
+void endpointStart()
 {
   relay.on();
 
   server.send(201);
 }
 
-void stop()
+void endpointStop()
 {
   relay.off();
 
@@ -45,16 +46,15 @@ void setup()
 {
   Serial.begin(9600);
 
-  String host = "kelvin-switch-";
   host += ESP.getChipId();
 
   net = NetworkClient(&host);
 
   net.connect();
 
-  server.on("/status", showStatus);
-  server.on("/on", start);
-  server.on("/off", stop);
+  server.on("/api/status", endpointStatus);
+  server.on("/api/on", endpointStart);
+  server.on("/api/off", endpointStop);
   server.begin();
 
   Serial.println("Server is ready");
