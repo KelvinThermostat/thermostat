@@ -1,49 +1,42 @@
 #include "Relay.h"
 
+#ifdef RELAY_SERIAL
 const byte _relay_state_on[] = {0xA0, 0x01, 0x01, 0xa2};
 const byte _relay_state_off[] = {0xA0, 0x01, 0x00, 0xa1};
-const ulong _relay_max_uptime = 18000000;
+#endif
 
-ulong _relay_uptime = 0;
-ulong _relay_start_time = 0;
-bool _currentState;
+#define RELAY_PIN 5
+
+bool _isOn = false;
+
+Relay::Relay()
+{
+    pinMode(RELAY_PIN, OUTPUT);
+}
 
 void Relay::on()
 {
+#ifdef RELAY_SERIAL
     Serial.write(_relay_state_on, sizeof(_relay_state_on));
-    _currentState = true;
-    _relay_start_time = millis();
+#else
+    digitalWrite(RELAY_PIN, HIGH);
+#endif
+
+    _isOn = true;
 }
 
 void Relay::off()
 {
+#ifdef RELAY_SERIAL
     Serial.write(_relay_state_off, sizeof(_relay_state_off));
-    _currentState = false;
-    _relay_start_time = 0;
-    _relay_uptime = 0;
-}
+#else
+    digitalWrite(RELAY_PIN, LOW);
+#endif
 
-void Relay::check()
-{
-    if (_currentState)
-    {
-        _relay_uptime = millis() - _relay_start_time;
-
-        if (_relay_uptime > _relay_max_uptime)
-        {
-            off();
-        }
-    }
+    _isOn = false;
 }
 
 bool Relay::isOn()
 {
-    return _currentState;
-}
-
-ulong Relay::getUpTime()
-{
-    int uptimeInSeconds = _relay_uptime / 1000;
-
-    return uptimeInSeconds;
+    return _isOn;
 }
