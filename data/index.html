@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kelvin Thermostat</title>
+    <link rel="stylesheet" href="https://unpkg.com/chota@latest">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="mask-icon" href="/safari-pinned-tab.svg" color="#5bbad5">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="theme-color" content="#ffffff">
+</head>
+
+<body>
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <fieldset>
+                    <legend>Status</legend>
+                    <p class="text-center">
+                        Current Temperature
+                        <br>
+                        <span class="tag is-large" id="current-temperature"></span> C
+                        <br>
+                        Target Temperature
+                        <br>
+                        <span class="tag is-large" id="target-temperature"></span> C
+                        <br>
+                        Humidity
+                        <br>
+                        <span class="tag is-large" id="humidity"></span> %
+                        <br>
+                        Heating
+                        <br>
+                        <span class="tag is-large" id="heating"></span>
+                        <br>
+                        <span id="heating-status" class="text-grey"></span>
+                        <br>
+                        <button id="stop-heating" class="button error is-hidden" onclick="stop()">Stop</button>
+                    </p>
+                </fieldset>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <label for="target">Target(C)</label>
+                <input type="number" id="target" min="0" max="25" step="0.1" value="0">
+            </div>
+            <div class="col">
+                <button class="button primary outline" onclick="setTargetTemperature()">Set</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                <label for="boost-uptime">Boost(Minutes)</label>
+                <input type="number" id="boost-uptime" min="10" max="60" value="30">
+            </div>
+            <div class="col">
+                <button class="button primary outline" onclick="boost()">Boost</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        function onLoad() {
+            fetch('/api/status', {
+                method: "GET"
+            })
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('Error getting thermostat status, reload the page.')
+                    }
+
+                    return response.json()
+                })
+                .then(function (status) {
+                    var heatingStatus = ''
+                    var heatingState = 'OFF'
+
+                    if (status.heating) {
+                        heatingState = `ON`
+                        heatingStatus = `${status.boosting ? 'Boosted' : 'Started'} at ${status.started_at} - ${status.uptime_left_minutes} minutes left`
+                        document.getElementById('stop-heating').classList.remove('is-hidden')
+                    } else {
+                        document.getElementById('stop-heating').classList.add('is-hidden')
+                    }
+
+                    document.getElementById('heating').innerText = heatingState
+                    document.getElementById('heating-status').innerText = heatingStatus
+                    document.getElementById('target-temperature').innerText = status.target_temperature
+                    document.getElementById('current-temperature').innerText = status.actual_temperature
+                    document.getElementById('humidity').innerText = status.humidity
+                })
+                .catch(function (error) {
+                    alert(error)
+                    console.log(error)
+                })
+        }
+
+        function setTargetTemperature() {
+            var target = document.getElementById('target').value;
+
+            if (confirm(`Set target temperature to ${target}(C)?`)) {
+                fetch(`/api/heating?target=${target}`, {
+                    method: "GET"
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Error setting target temperature, reload the page.')
+                        }
+
+                        return response.body
+                    })
+                    .then(function (data) {
+                        onLoad()
+                    })
+                    .catch(function (error) {
+                        alert(error)
+                        console.log(error)
+                    })
+            }
+        }
+
+        function boost() {
+            var uptime = document.getElementById('boost-uptime').value;
+
+            if (confirm(`Boost heating for ${uptime} minutes?`)) {
+                fetch(`/api/heating/boost?uptime=${uptime}`, {
+                    method: "GET"
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Error boosting, reload the page.')
+                        }
+
+                        return response.body
+                    })
+                    .then(function (data) {
+                        onLoad()
+                    })
+                    .catch(function (error) {
+                        alert(error)
+                        console.log(error)
+                    })
+            }
+        }
+
+        function stop() {
+            if (confirm('Stop heating?')) {
+                fetch('/api/heating/off', {
+                    method: "GET"
+                })
+                    .then(function (response) {
+                        if (!response.ok) {
+                            throw new Error('Error stopping heating, reload the page.')
+                        }
+
+                        return response.body
+                    })
+                    .then(function (data) {
+                        onLoad()
+                    })
+                    .catch(function (error) {
+                        alert(error)
+                        console.log(error)
+                    })
+            }
+        }
+
+        onLoad()
+
+        setInterval(onLoad, 5000)
+    </script>
+</body>
+
+</html>
