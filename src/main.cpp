@@ -1,5 +1,5 @@
 #include <ArduinoJson.h>
-#include <AsyncElegantOTA.h>
+#include <ElegantOTA.h>
 #include <EEPROM.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncWebServer.h>
@@ -14,6 +14,7 @@
 #define SENSOR_CHECK_DELAY 200000
 #define DEFAULT_UPTIME 2700000
 #define HOST_NAME "kelvin-switch"
+#define MILISECONDS_FACTOR 60000
 
 const char *MIME_TEXT = "text/plain";
 const char *MIME_JSON = "application/json";
@@ -24,7 +25,8 @@ float _actualTemperature = 0;
 byte _actualHumidity = 0;
 unsigned long _lastSensorCheck = 0;
 unsigned long _lastTemperatureCheck = 0;
-unsigned long _heating_max_uptime = DEFAULT_UPTIME;
+unsigned int _heating_default_uptime = DEFAULT_UPTIME;
+unsigned long _heating_max_uptime = _heating_default_uptime;
 unsigned long _heating_uptime = 0;
 unsigned long _heating_start_time = 0;
 bool _heating_boost = false;
@@ -119,7 +121,7 @@ void startHeating(unsigned long uptime)
 
 void startHeating()
 {
-    startHeating(DEFAULT_UPTIME);
+    startHeating(_heating_default_uptime);
 }
 
 void stopHeating()
@@ -195,6 +197,23 @@ void endpointSetTemperature(AsyncWebServerRequest *request)
     }
 }
 
+void endpointSetUptime(AsyncWebServerRequest *request)
+{
+    if (request->hasArg("value"))
+    {
+        _heating_default_uptime = request->arg("value").toInt() * MILISECONDS_FACTOR;
+
+        EEPROM.put(sizeof(unsigned int), _heating_default_uptime);
+        EEPROM.commit();
+
+        request->send(200, MIME_TEXT, F("Default uptime set."));
+    }
+    else
+    {
+        request->send(400, MIME_TEXT, F("Value in minutes not provided."));
+    }
+}
+
 void endpointStatus(AsyncWebServerRequest *request)
 {
     AsyncResponseStream *response = request->beginResponseStream("application/json");
@@ -207,6 +226,7 @@ void endpointStatus(AsyncWebServerRequest *request)
     json["uptime_left_minutes"] = getLeftUptime();
     json["started_at"] = _heating_start_datetime;
     json["sensor_host"] = _sensor_host;
+    json["default_uptime"] = _heating_default_uptime / MILISECONDS_FACTOR;
 
     serializeJson(json, *response);
     request->send(response);
@@ -262,6 +282,7 @@ void setup()
     server.on("/api/heating/off", endpointStop);
     server.on("/api/heating/boost", endpointBoost);
     server.on("/api/heating", endpointSetTemperature);
+    server.on("/api/uptime", endpointSetUptime);
 
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
               { request->send(LittleFS, "/index.html", "text/html", false); });
@@ -271,10 +292,42 @@ void setup()
 
     server.serveStatic("/", LittleFS, "/");
 
-    AsyncElegantOTA.begin(&server);
+    ElegantOTA.begin(&server);
     server.begin();
 
-    EEPROM.get(0, _targetTemperature);
+    unsigned int uptime;
+    float temperature;
+
+    EEPROM.get(0, temperature);
+    EEPROM.get(sizeof(unsigned int), uptime);
+
+    if (isnan(temperature))
+    {
+        _targetTemperature = 0;
+
+        Serial.println(F("Target temperature not set, using default"));
+    }
+    else
+    {
+        _targetTemperature = temperature;
+
+        Serial.print(F("Target temperature set: "));
+        Serial.println(_targetTemperature);
+    }
+
+    if (isnan(uptime))
+    {
+        _heating_default_uptime = DEFAULT_UPTIME;
+
+        Serial.println(F("Heating uptime not set, using default"));
+    }
+    else
+    {
+        _heating_default_uptime = uptime;
+
+        Serial.print(F("Heating uptime set: "));
+        Serial.println(_heating_default_uptime);
+    }
 
     Serial.println(F("Server is ready"));
 
